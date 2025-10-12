@@ -499,6 +499,7 @@ def plot_comparison(strategy_results):
     ax1 = axes[0, 0]
     colors = ['blue', 'green', 'red']
     strategy_names = ['无过滤', '轻量级', '自适应']
+    color_mapping = dict(zip(strategy_names, colors))  # 创建策略名称到颜色的映射
 
     for i, (name, color) in enumerate(zip(strategy_names, colors)):
         if name in strategy_results and strategy_results[name][4]:  # 检查stats是否存在
@@ -536,8 +537,10 @@ def plot_comparison(strategy_results):
 
         for name, metrics_values in strategy_metrics.items():
             values = metrics_values + [metrics_values[0]]  # 闭合图形
-            ax2.plot(angles, values, 'o-', linewidth=2, label=name)
-            ax2.fill(angles, values, alpha=0.1)
+            # 使用对应的颜色绘制线条
+            color = color_mapping.get(name, 'gray')  # 如果没有匹配的颜色，使用灰色
+            ax2.plot(angles, values, 'o-', linewidth=2, label=name, color=color)
+            ax2.fill(angles, values, alpha=0.1, color=color)
 
         ax2.set_xticks(angles[:-1])
         ax2.set_xticklabels(metrics)

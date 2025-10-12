@@ -329,7 +329,7 @@ def simple_stock_analysis():
     set_chinese_font()
 
     # 获取数据
-    stock_code = "2330.TW"
+    stock_code = "0050.TW"
     # stock_code = "2891.TW"
     years = 10
     end_date = datetime.now()

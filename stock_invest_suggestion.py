@@ -168,26 +168,45 @@ def create_investment_portfolio(df):
 
     portfolio = {}
 
+    # 最多顯示3筆
+    # # 核心持仓筛选 (AI/半导体)
+    # core_stocks = df[df['代號'].astype(str).isin(ai_semiconductor)].copy()
+    # if len(core_stocks) > 0:
+    #     core_stocks = core_stocks.nlargest(min(3, len(core_stocks)), '投资评分')
+    #     portfolio['核心持仓'] = core_stocks
+    #
+    # # 辅助持仓筛选 (绿能+电子零组件)
+    # auxiliary_stocks = df[df['代號'].astype(str).isin(green_energy + electronic_components)].copy()
+    # if len(auxiliary_stocks) > 0:
+    #     auxiliary_stocks = auxiliary_stocks.nlargest(min(3, len(auxiliary_stocks)), '投资评分')
+    #     portfolio['辅助持仓'] = auxiliary_stocks
+    #
+    # # 价值型持仓筛选
+    # value_stocks_df = df[df['代號'].astype(str).isin(value_stocks)].copy()
+    # if len(value_stocks_df) > 0:
+    #     value_stocks_df = value_stocks_df.nlargest(min(2, len(value_stocks_df)), '投资评分')
+    #     portfolio['价值型持仓'] = value_stocks_df
+
+    # 全部顯示
     # 核心持仓筛选 (AI/半导体)
     core_stocks = df[df['代號'].astype(str).isin(ai_semiconductor)].copy()
     if len(core_stocks) > 0:
-        core_stocks = core_stocks.nlargest(min(3, len(core_stocks)), '投资评分')
-        portfolio['核心持仓'] = core_stocks
+       core_stocks = core_stocks.nlargest(max(3, len(core_stocks)), '投资评分')
+       portfolio['核心持仓'] = core_stocks
 
     # 辅助持仓筛选 (绿能+电子零组件)
     auxiliary_stocks = df[df['代號'].astype(str).isin(green_energy + electronic_components)].copy()
     if len(auxiliary_stocks) > 0:
-        auxiliary_stocks = auxiliary_stocks.nlargest(min(3, len(auxiliary_stocks)), '投资评分')
-        portfolio['辅助持仓'] = auxiliary_stocks
+       auxiliary_stocks = auxiliary_stocks.nlargest(max(3, len(auxiliary_stocks)), '投资评分')
+       portfolio['辅助持仓'] = auxiliary_stocks
 
     # 价值型持仓筛选
     value_stocks_df = df[df['代號'].astype(str).isin(value_stocks)].copy()
     if len(value_stocks_df) > 0:
-        value_stocks_df = value_stocks_df.nlargest(min(2, len(value_stocks_df)), '投资评分')
-        portfolio['价值型持仓'] = value_stocks_df
+       value_stocks_df = value_stocks_df.nlargest(max(2, len(value_stocks_df)), '投资评分')
+       portfolio['价值型持仓'] = value_stocks_df
 
     return portfolio
-
 
 def plot_radar_chart(portfolio):
     """绘制投资组合雷达图"""
@@ -396,7 +415,7 @@ def main():
     """主函数"""
 
     # 读取数据 - 使用原始字符串避免转义问题
-    file_path = r"C:\Users\Raymond\Desktop\D data\pytjhon_test\Stock.xls"
+    file_path = r"C:\Users\Raymond\Desktop\D data\pytjhon_test\stock100.xls"
     df = read_and_process_data(file_path)
 
     if df is None:

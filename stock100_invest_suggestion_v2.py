@@ -168,22 +168,31 @@ def create_investment_portfolio(df):
 
     portfolio = {}
 
-    # 核心持仓筛选 (AI/半导体)
+    # 核心持仓筛选 (AI/半导体) - 过滤掉PEG为负的股票
     core_stocks = df[df['代號'].astype(str).isin(ai_semiconductor)].copy()
+    # 过滤PEG为负的股票
+    core_stocks = core_stocks[(core_stocks['PEG▼'] > 0) | (core_stocks['PEG▼'].isna())]
     if len(core_stocks) > 0:
         core_stocks = core_stocks.nlargest(max(3, len(core_stocks)), '投资评分')
+        core_stocks = core_stocks[core_stocks['投资评分'] > 0]
         portfolio['核心持仓'] = core_stocks
 
-    # 辅助持仓筛选 (绿能+电子零组件)
+    # 辅助持仓筛选 (绿能+电子零组件) - 过滤掉PEG为负的股票
     auxiliary_stocks = df[df['代號'].astype(str).isin(green_energy + electronic_components)].copy()
+    # 过滤PEG为负的股票
+    auxiliary_stocks = auxiliary_stocks[(auxiliary_stocks['PEG▼'] > 0) | (auxiliary_stocks['PEG▼'].isna())]
     if len(auxiliary_stocks) > 0:
         auxiliary_stocks = auxiliary_stocks.nlargest(max(3, len(auxiliary_stocks)), '投资评分')
+        auxiliary_stocks = auxiliary_stocks[auxiliary_stocks['投资评分'] > 0]
         portfolio['辅助持仓'] = auxiliary_stocks
 
-    # 价值型持仓筛选
+    # 价值型持仓筛选 - 过滤掉PEG为负的股票
     value_stocks_df = df[df['代號'].astype(str).isin(value_stocks)].copy()
+    # 过滤PEG为负的股票
+    value_stocks_df = value_stocks_df[(value_stocks_df['PEG▼'] > 0) | (value_stocks_df['PEG▼'].isna())]
     if len(value_stocks_df) > 0:
         value_stocks_df = value_stocks_df.nlargest(max(2, len(value_stocks_df)), '投资评分')
+        value_stocks_df = value_stocks_df[value_stocks_df['投资评分'] > 0]
         portfolio['价值型持仓'] = value_stocks_df
 
     return portfolio
@@ -416,7 +425,7 @@ def main():
     """主函数"""
 
     # 读取数据 - 使用原始字符串避免转义问题
-    file_path = r"C:\Users\Raymond\Desktop\D data\pytjhon_test\Stock.xls"
+    file_path = r"C:\Users\Raymond\Desktop\D data\pytjhon_test\stock50.xls"
     df = read_and_process_data(file_path)
 
     if df is None:

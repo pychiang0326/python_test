@@ -171,7 +171,7 @@ def create_investment_portfolio(df):
     # 核心持仓筛选 (AI/半导体) - 过滤掉PEG为负的股票
     core_stocks = df[df['代號'].astype(str).isin(ai_semiconductor)].copy()
     # 过滤PEG为负的股票
-    core_stocks = core_stocks[(core_stocks['PEG▼'] > 0) | (core_stocks['PEG▼'].isna())]
+    core_stocks = core_stocks[((core_stocks['PEG▼'] > 0) & (core_stocks['PEG▼'] < 3)) | (core_stocks['PEG▼'].isna())]
     if len(core_stocks) > 0:
         core_stocks = core_stocks.nlargest(max(3, len(core_stocks)), '投资评分')
         core_stocks = core_stocks[core_stocks['投资评分'] > 0]
@@ -180,7 +180,7 @@ def create_investment_portfolio(df):
     # 辅助持仓筛选 (绿能+电子零组件) - 过滤掉PEG为负的股票
     auxiliary_stocks = df[df['代號'].astype(str).isin(green_energy + electronic_components)].copy()
     # 过滤PEG为负的股票
-    auxiliary_stocks = auxiliary_stocks[(auxiliary_stocks['PEG▼'] > 0) | (auxiliary_stocks['PEG▼'].isna())]
+    auxiliary_stocks = auxiliary_stocks[((auxiliary_stocks['PEG▼'] > 0) & (auxiliary_stocks['PEG▼'] < 3)) | (auxiliary_stocks['PEG▼'].isna())]
     if len(auxiliary_stocks) > 0:
         auxiliary_stocks = auxiliary_stocks.nlargest(max(3, len(auxiliary_stocks)), '投资评分')
         auxiliary_stocks = auxiliary_stocks[auxiliary_stocks['投资评分'] > 0]
@@ -189,7 +189,7 @@ def create_investment_portfolio(df):
     # 价值型持仓筛选 - 过滤掉PEG为负的股票
     value_stocks_df = df[df['代號'].astype(str).isin(value_stocks)].copy()
     # 过滤PEG为负的股票
-    value_stocks_df = value_stocks_df[(value_stocks_df['PEG▼'] > 0) | (value_stocks_df['PEG▼'].isna())]
+    value_stocks_df = value_stocks_df[((value_stocks_df['PEG▼'] > 0) & (value_stocks_df['PEG▼'] < 3)) | (value_stocks_df['PEG▼'].isna())]
     if len(value_stocks_df) > 0:
         value_stocks_df = value_stocks_df.nlargest(max(2, len(value_stocks_df)), '投资评分')
         value_stocks_df = value_stocks_df[value_stocks_df['投资评分'] > 0]

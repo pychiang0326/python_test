@@ -166,12 +166,6 @@ def create_investment_portfolio(df):
     electronic_components = ['2308', '2327', '6271', '3044', '2313']
     value_stocks = ['2891', '2886', '5880', '2890', '2603']
 
-    # old
-    # ai_semiconductor = ['2330', '2454', '3017', '2382', '3711']
-    # green_energy = ['1519', '1513', '6806']
-    # electronic_components = ['3044', '2308', '2313']
-    # value_stocks = ['2603', '2618', '2891']
-
     portfolio = {}
 
     # 核心持仓筛选 (AI/半导体)
@@ -306,13 +300,30 @@ def plot_investment_pie_chart(portfolio):
     stock_allocation = {}
 
     for category, stocks in portfolio.items():
-        total_score = stocks['投资评分'].sum()
+        # 确保投资评分非负
+        positive_scores = stocks['投资评分'].clip(lower=0.1)  # 将负分或零分设为0.1，避免除零错误
+        total_score = positive_scores.sum()
         category_weight = allocation.get(category, 0)
 
-        for _, stock in stocks.iterrows():
-            stock_key = f"{stock['名稱']}({stock['代號']})"
-            stock_weight = (stock['投资评分'] / total_score) * category_weight
-            stock_allocation[stock_key] = stock_weight
+        # 如果总评分为0，则平均分配权重
+        if total_score <= 0:
+            equal_weight = category_weight / len(stocks)
+            for _, stock in stocks.iterrows():
+                stock_key = f"{stock['名稱']}({stock['代號']})"
+                stock_allocation[stock_key] = equal_weight
+        else:
+            for _, stock in stocks.iterrows():
+                stock_key = f"{stock['名稱']}({stock['代號']})"
+                stock_weight = (positive_scores.loc[stock.name] / total_score) * category_weight
+                stock_allocation[stock_key] = stock_weight
+
+    # 过滤掉权重为0或负值的股票
+    stock_allocation = {k: v for k, v in stock_allocation.items() if v > 0}
+
+    # 如果没有有效的股票数据，直接返回
+    if not stock_allocation:
+        print("没有有效的股票权重数据，无法绘制饼图")
+        return {}
 
     # 绘制饼图
     if len(allocation) > 1:
@@ -333,6 +344,9 @@ def plot_investment_pie_chart(portfolio):
     # 个股比例饼图
     stock_labels = list(stock_allocation.keys())
     stock_sizes = list(stock_allocation.values())
+
+    # 再次确保没有负值或零值
+    stock_sizes = [max(0.001, size) for size in stock_sizes]  # 确保最小值不为零
 
     if ax1 is not None:
         ax2.pie(stock_sizes, labels=stock_labels, autopct='%1.1f%%', startangle=90)

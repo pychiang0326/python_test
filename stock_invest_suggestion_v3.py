@@ -30,7 +30,7 @@ def read_and_process_data(file_path):
         if file_ext == '.xls':
             # 对于.xls文件，尝试使用xlrd引擎
             try:
-                df = pd.read_excel(file_path, sheet_name='Sheet1', engine='xlrd')
+                df = pd.read_excel(file_path, sheet_name='StockList', engine='xlrd')
             except ImportError:
                 print("请安装xlrd库: pip install xlrd")
                 return None
@@ -38,7 +38,7 @@ def read_and_process_data(file_path):
                 print(f"使用xlrd读取失败: {e}")
                 # 尝试使用openpyxl作为备选
                 try:
-                    df = pd.read_excel(file_path, sheet_name='Sheet1', engine='openpyxl')
+                    df = pd.read_excel(file_path, sheet_name='StockList', engine='openpyxl')
                 except Exception as e2:
                     print(f"使用openpyxl读取也失败: {e2}")
                     return None
@@ -425,7 +425,7 @@ def main():
     """主函数"""
 
     # 读取数据 - 使用原始字符串避免转义问题
-    file_path = r"C:\Users\Raymond\Desktop\D data\pytjhon_test\twn50.xls"
+    file_path = r"C:\Users\Raymond\Desktop\D data\pytjhon_test\twn100.xls"
     df = read_and_process_data(file_path)
 
     if df is None:

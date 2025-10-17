@@ -73,7 +73,7 @@ def read_and_process_data(file_path):
         print(f"标准化后列名: {df.columns.tolist()}")
 
         # 转换数值列
-        numeric_columns = ['成交', 'PER', 'PEG▼', 'PBR', '最新年度營收增減(%)',
+        numeric_columns = ['成交', 'PER', 'PEG', 'PBR', '最新年度營收增減(%)',
                            '最新年度每股盈餘增減(%)', '最新年度ROE(%)', '最新年度毛利率(%)',
                            '最新年度營益率(%)', '最新年度自由金流(億)', '最新年度負債總額佔比(%)',
                            '最新年度流動資產對流動負債(%)', '最新年度利息保障倍數']
@@ -101,13 +101,13 @@ def calculate_investment_score(df):
         score = 0
 
         # PEG评分 (越低越好，负值扣分)
-        # 使用标准化的列名 'PEG▼'
-        if pd.notna(stock['PEG▼']):
-            if stock['PEG▼'] > 0 and stock['PEG▼'] < 1:
+        # 使用标准化的列名 'PEG'
+        if pd.notna(stock['PEG']):
+            if stock['PEG'] > 0 and stock['PEG'] < 1:
                 score += 30
-            elif stock['PEG▼'] >= 1 and stock['PEG▼'] < 2:
+            elif stock['PEG'] >= 1 and stock['PEG'] < 2:
                 score += 15
-            elif stock['PEG▼'] < 0:
+            elif stock['PEG'] < 0:
                 score -= 10
 
         # 营收增长评分
@@ -171,7 +171,7 @@ def create_investment_portfolio(df):
     # 核心持仓筛选 (AI/半导体) - 过滤掉PEG为负的股票
     core_stocks = df[df['代號'].astype(str).isin(ai_semiconductor)].copy()
     # 过滤PEG为负的股票
-    core_stocks = core_stocks[((core_stocks['PEG▼'] > 0) & (core_stocks['PEG▼'] < 3)) | (core_stocks['PEG▼'].isna())]
+    core_stocks = core_stocks[((core_stocks['PEG'] > 0) & (core_stocks['PEG'] < 3)) | (core_stocks['PEG'].isna())]
     if len(core_stocks) > 0:
         core_stocks = core_stocks.nlargest(max(3, len(core_stocks)), '投资评分')
         core_stocks = core_stocks[core_stocks['投资评分'] > 0]
@@ -180,7 +180,7 @@ def create_investment_portfolio(df):
     # 辅助持仓筛选 (绿能+电子零组件) - 过滤掉PEG为负的股票
     auxiliary_stocks = df[df['代號'].astype(str).isin(green_energy + electronic_components)].copy()
     # 过滤PEG为负的股票
-    auxiliary_stocks = auxiliary_stocks[((auxiliary_stocks['PEG▼'] > 0) & (auxiliary_stocks['PEG▼'] < 3)) | (auxiliary_stocks['PEG▼'].isna())]
+    auxiliary_stocks = auxiliary_stocks[((auxiliary_stocks['PEG'] > 0) & (auxiliary_stocks['PEG'] < 3)) | (auxiliary_stocks['PEG'].isna())]
     if len(auxiliary_stocks) > 0:
         auxiliary_stocks = auxiliary_stocks.nlargest(max(3, len(auxiliary_stocks)), '投资评分')
         auxiliary_stocks = auxiliary_stocks[auxiliary_stocks['投资评分'] > 0]
@@ -189,7 +189,7 @@ def create_investment_portfolio(df):
     # 价值型持仓筛选 - 过滤掉PEG为负的股票
     value_stocks_df = df[df['代號'].astype(str).isin(value_stocks)].copy()
     # 过滤PEG为负的股票
-    value_stocks_df = value_stocks_df[((value_stocks_df['PEG▼'] > 0) & (value_stocks_df['PEG▼'] < 3)) | (value_stocks_df['PEG▼'].isna())]
+    value_stocks_df = value_stocks_df[((value_stocks_df['PEG'] > 0) & (value_stocks_df['PEG'] < 3)) | (value_stocks_df['PEG'].isna())]
     if len(value_stocks_df) > 0:
         value_stocks_df = value_stocks_df.nlargest(max(2, len(value_stocks_df)), '投资评分')
         value_stocks_df = value_stocks_df[value_stocks_df['投资评分'] > 0]
@@ -230,9 +230,9 @@ def plot_radar_chart(portfolio):
             values = []
 
             # 估值吸引力 (基于PEG和PER)
-            # 使用标准化的列名 'PEG▼'
-            if pd.notna(stock['PEG▼']) and stock['PEG▼'] > 0:
-                peg_score = max(0, min(1, 1 / stock['PEG▼']))
+            # 使用标准化的列名 'PEG'
+            if pd.notna(stock['PEG']) and stock['PEG'] > 0:
+                peg_score = max(0, min(1, 1 / stock['PEG']))
             else:
                 peg_score = 0
             values.append(peg_score)
@@ -399,9 +399,9 @@ def display_portfolio_details(portfolio, stock_allocation):
 
             # 显示关键指标
             key_metrics = []
-            # 使用标准化的列名 'PEG▼'
-            if pd.notna(stock['PEG▼']):
-                key_metrics.append(f"PEG: {stock['PEG▼']:.2f}")
+            # 使用标准化的列名 'PEG'
+            if pd.notna(stock['PEG']):
+                key_metrics.append(f"PEG: {stock['PEG']:.2f}")
             if pd.notna(stock['最新年度營收增減(%)']):
                 key_metrics.append(f"营收增长: {stock['最新年度營收增減(%)']:.1f}%")
             if pd.notna(stock['最新年度ROE(%)']):
@@ -425,7 +425,7 @@ def main():
     """主函数"""
 
     # 读取数据 - 使用原始字符串避免转义问题
-    file_path = r"C:\Users\Raymond\Desktop\D data\pytjhon_test\Stock.xls"
+    file_path = r"C:\Users\Raymond\Desktop\D data\pytjhon_test\twn50.xls"
     df = read_and_process_data(file_path)
 
     if df is None:
@@ -464,8 +464,8 @@ def main():
 
     if all_stocks:
         # 计算平均值，忽略NaN值
-        # 使用标准化的列名 'PEG▼'
-        peg_values = [s.get('PEG▼') for s in all_stocks if pd.notna(s.get('PEG▼'))]
+        # 使用标准化的列名 'PEG'
+        peg_values = [s.get('PEG') for s in all_stocks if pd.notna(s.get('PEG'))]
         revenue_values = [s.get('最新年度營收增減(%)') for s in all_stocks if pd.notna(s.get('最新年度營收增減(%)'))]
         roe_values = [s.get('最新年度ROE(%)') for s in all_stocks if pd.notna(s.get('最新年度ROE(%)'))]
 

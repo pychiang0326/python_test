@@ -171,26 +171,29 @@ def create_investment_portfolio(df):
         tech_stocks = tech_stocks[((tech_stocks['PEG'] > 0) & (tech_stocks['PEG'] < 3)) | (tech_stocks['PEG'].isna())]
         if len(tech_stocks) > 0:
             tech_stocks = tech_stocks.nlargest(min(5, len(tech_stocks)), '投资评分')
+            tech_stocks = tech_stocks[tech_stocks['投资评分'] > 0]
             portfolio['科技成长股'] = tech_stocks
 
     # 识别生技医疗类股票
     #bio_stocks = df[df['產業別'].str.contains('生技|醫療|綠能', na=False)].copy()
-    bio_keywords = ['生技', '醫療', '綠能']
-    bio_stocks = df[df['產業別'].str.contains('|'.join(bio_keywords), na=False)].copy()
-    if len(bio_stocks) > 0:
-        bio_stocks = bio_stocks[((bio_stocks['PEG'] > 0) & (bio_stocks['PEG'] < 3)) | (bio_stocks['PEG'].isna())]
-        if len(bio_stocks) > 0:
-            bio_stocks = bio_stocks.nlargest(min(3, len(bio_stocks)), '投资评分')
-            portfolio['生技医疗'] = bio_stocks
+    auxiliary_keywords = ['生技', '醫療', '綠能', '汽車', '電機']
+    auxiliary_stocks = df[df['產業別'].str.contains('|'.join(auxiliary_keywords), na=False)].copy()
+    if len(auxiliary_stocks) > 0:
+        auxiliary_stocks = auxiliary_stocks[((auxiliary_stocks['PEG'] > 0) & (auxiliary_stocks['PEG'] < 3)) | (auxiliary_stocks['PEG'].isna())]
+        if len(auxiliary_stocks) > 0:
+            auxiliary_stocks = auxiliary_stocks.nlargest(min(3, len(auxiliary_stocks)), '投资评分')
+            auxiliary_stocks = auxiliary_stocks[auxiliary_stocks['投资评分'] > 0]
+            portfolio['辅助持仓股'] = auxiliary_stocks
 
     # 识别传统产业/价值股
-    value_keywords = ['鋼鐵', '塑膠', '橡膠', '建材', '紡織', '食品', '汽車', '貿易', '居家', '金控', '證劵', '銀行', '油電']
+    value_keywords = ['鋼鐵', '塑膠', '橡膠', '建材', '紡織', '食品', '汽車', '貿易', '居家', '金控', '證劵', '銀行', '油電', '運動休閒']
     value_stocks = df[df['產業別'].str.contains('|'.join(value_keywords), na=False)].copy()
     if len(value_stocks) > 0:
         value_stocks = value_stocks[
             ((value_stocks['PEG'] > 0) & (value_stocks['PEG'] < 3)) | (value_stocks['PEG'].isna())]
         if len(value_stocks) > 0:
             value_stocks = value_stocks.nlargest(min(3, len(value_stocks)), '投资评分')
+            value_stocks = value_stocks[value_stocks['投资评分'] > 0]
             portfolio['传统价值股'] = value_stocks
 
     # 如果以上分类都没有找到股票，则选择整体评分最高的股票

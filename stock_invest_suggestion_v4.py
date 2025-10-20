@@ -158,42 +158,47 @@ def calculate_investment_score(df):
 
 
 def create_investment_portfolio(df):
-    """创建投资组合"""
+    """创建投资组合 - 动态适应不同的股票数据集"""
 
-    # 定义各类别股票
-    ai_semiconductor = ['2330', '2454', '2303', '3711', '3034', '2379', '3661', '5274', '4966', '3105']
-    green_energy = ['6806', '6443', '1513', '1519', '8374', '2308', '2301', '1504']
-    electronic_components = ['2327', '6271', '3044', '2313', '2456', '2356', '2353', '2383']
-    value_stocks = ['2891', '2886', '5880', '2890', '2603', '2412', '1216', '2207']
-
+    # 动态识别股票类别，基于数据中的实际股票代码
     portfolio = {}
 
-    # 核心持仓筛选 (AI/半导体) - 过滤掉PEG为负的股票
-    core_stocks = df[df['代號'].astype(str).isin(ai_semiconductor)].copy()
-    # 过滤PEG为负的股票
-    core_stocks = core_stocks[((core_stocks['PEG'] > 0) & (core_stocks['PEG'] < 3)) | (core_stocks['PEG'].isna())]
-    if len(core_stocks) > 0:
-        core_stocks = core_stocks.nlargest(max(3, len(core_stocks)), '投资评分')
-        core_stocks = core_stocks[core_stocks['投资评分'] > 0]
-        portfolio['核心持仓'] = core_stocks
+    # 识别半导体/科技类股票
+    tech_keywords = ['半導體', '電子', '電腦', '通信', '資訊', '光電']
+    tech_stocks = df[df['產業別'].str.contains('|'.join(tech_keywords), na=False)].copy()
+    if len(tech_stocks) > 0:
+        # 过滤PEG在合理范围内的股票
+        tech_stocks = tech_stocks[((tech_stocks['PEG'] > 0) & (tech_stocks['PEG'] < 3)) | (tech_stocks['PEG'].isna())]
+        if len(tech_stocks) > 0:
+            tech_stocks = tech_stocks.nlargest(min(5, len(tech_stocks)), '投资评分')
+            portfolio['科技成长股'] = tech_stocks
 
-    # 辅助持仓筛选 (绿能+电子零组件) - 过滤掉PEG为负的股票
-    auxiliary_stocks = df[df['代號'].astype(str).isin(green_energy + electronic_components)].copy()
-    # 过滤PEG为负的股票
-    auxiliary_stocks = auxiliary_stocks[((auxiliary_stocks['PEG'] > 0) & (auxiliary_stocks['PEG'] < 3)) | (auxiliary_stocks['PEG'].isna())]
-    if len(auxiliary_stocks) > 0:
-        auxiliary_stocks = auxiliary_stocks.nlargest(max(3, len(auxiliary_stocks)), '投资评分')
-        auxiliary_stocks = auxiliary_stocks[auxiliary_stocks['投资评分'] > 0]
-        portfolio['辅助持仓'] = auxiliary_stocks
+    # 识别生技医疗类股票
+    bio_stocks = df[df['產業別'].str.contains('生技|醫療', na=False)].copy()
+    if len(bio_stocks) > 0:
+        bio_stocks = bio_stocks[((bio_stocks['PEG'] > 0) & (bio_stocks['PEG'] < 3)) | (bio_stocks['PEG'].isna())]
+        if len(bio_stocks) > 0:
+            bio_stocks = bio_stocks.nlargest(min(3, len(bio_stocks)), '投资评分')
+            portfolio['生技医疗'] = bio_stocks
 
-    # 价值型持仓筛选 - 过滤掉PEG为负的股票
-    value_stocks_df = df[df['代號'].astype(str).isin(value_stocks)].copy()
-    # 过滤PEG为负的股票
-    value_stocks_df = value_stocks_df[((value_stocks_df['PEG'] > 0) & (value_stocks_df['PEG'] < 3)) | (value_stocks_df['PEG'].isna())]
-    if len(value_stocks_df) > 0:
-        value_stocks_df = value_stocks_df.nlargest(max(2, len(value_stocks_df)), '投资评分')
-        value_stocks_df = value_stocks_df[value_stocks_df['投资评分'] > 0]
-        portfolio['价值型持仓'] = value_stocks_df
+    # 识别传统产业/价值股
+    value_keywords = ['鋼鐵', '塑膠', '橡膠', '建材', '紡織', '食品', '汽車', '貿易', '居家', '金控', '證劵', '銀行']
+    value_stocks = df[df['產業別'].str.contains('|'.join(value_keywords), na=False)].copy()
+    if len(value_stocks) > 0:
+        value_stocks = value_stocks[
+            ((value_stocks['PEG'] > 0) & (value_stocks['PEG'] < 3)) | (value_stocks['PEG'].isna())]
+        if len(value_stocks) > 0:
+            value_stocks = value_stocks.nlargest(min(3, len(value_stocks)), '投资评分')
+            portfolio['传统价值股'] = value_stocks
+
+    # 如果以上分类都没有找到股票，则选择整体评分最高的股票
+    if not portfolio:
+        print("警告：无法按产业分类创建投资组合，改用整体评分筛选")
+        all_stocks = df.copy()
+        all_stocks = all_stocks[((all_stocks['PEG'] > 0) & (all_stocks['PEG'] < 3)) | (all_stocks['PEG'].isna())]
+        if len(all_stocks) > 0:
+            top_stocks = all_stocks.nlargest(min(8, len(all_stocks)), '投资评分')
+            portfolio['优质股票'] = top_stocks
 
     return portfolio
 
@@ -293,14 +298,29 @@ def plot_investment_pie_chart(portfolio):
 
     if not portfolio:
         print("投资组合为空，无法绘制饼图")
-        return {}
+        return {}, {}
 
-    # 设置投资比例
-    allocation = {
-        '核心持仓': 60,
-        '辅助持仓': 30,
-        '价值型持仓': 10
-    }
+    # 动态设置投资比例
+    allocation = {}
+    categories = list(portfolio.keys())
+
+    if len(categories) == 1:
+        allocation[categories[0]] = 100
+    elif len(categories) == 2:
+        allocation[categories[0]] = 70
+        allocation[categories[1]] = 30
+    elif len(categories) >= 3:
+        # 主要类别分配较高权重
+        main_categories = [cat for cat in categories if '科技' in cat or '成长' in cat]
+        if main_categories:
+            allocation[main_categories[0]] = 50
+            remaining_categories = [cat for cat in categories if cat not in main_categories]
+            for i, cat in enumerate(remaining_categories):
+                allocation[cat] = 50 // len(remaining_categories)
+        else:
+            # 平均分配
+            for cat in categories:
+                allocation[cat] = 100 // len(categories)
 
     # 只保留有股票的类别
     allocation = {k: v for k, v in allocation.items() if k in portfolio}
@@ -332,7 +352,7 @@ def plot_investment_pie_chart(portfolio):
     # 如果没有有效的股票数据，直接返回
     if not stock_allocation:
         print("没有有效的股票权重数据，无法绘制饼图")
-        return {}
+        return {}, {}
 
     # 绘制饼图
     if len(allocation) > 1:
@@ -367,10 +387,9 @@ def plot_investment_pie_chart(portfolio):
     plt.tight_layout()
     plt.show()
 
-    return stock_allocation
+    return allocation, stock_allocation  # 返回两个字典
 
-
-def display_portfolio_details(portfolio, stock_allocation):
+def display_portfolio_details(portfolio, allocation, stock_allocation):
     """显示投资组合详情"""
 
     print("=" * 80)
@@ -383,23 +402,22 @@ def display_portfolio_details(portfolio, stock_allocation):
 
     total_investment = 0
     for category, stocks in portfolio.items():
-        allocation_pct = get_allocation_percentage(category)
+        allocation_pct = allocation.get(category, 0)  # 使用动态分配的比例
         print(f"\n{category} (目标比例: {allocation_pct}%):")
         print("-" * 50)
 
         for _, stock in stocks.iterrows():
             stock_key = f"{stock['名稱']}({stock['代號']})"
-            allocation = stock_allocation.get(stock_key, 0)
-            total_investment += allocation
+            stock_weight = stock_allocation.get(stock_key, 0)
+            total_investment += stock_weight
 
             print(f"  股票: {stock['名稱']} ({stock['代號']})")
             print(f"  产业: {stock['產業別']}")
-            print(f"  建议权重: {allocation:.1f}%")
+            print(f"  建议权重: {stock_weight:.1f}%")
             print(f"  投资评分: {stock['投资评分']}")
 
             # 显示关键指标
             key_metrics = []
-            # 使用标准化的列名 'PEG'
             if pd.notna(stock['PEG']):
                 key_metrics.append(f"PEG: {stock['PEG']:.2f}")
             if pd.notna(stock['最新年度營收增減(%)']):
@@ -409,6 +427,7 @@ def display_portfolio_details(portfolio, stock_allocation):
 
             print(f"  关键指标: {', '.join(key_metrics)}")
             print()
+
 
 
 def get_allocation_percentage(category):
@@ -425,7 +444,7 @@ def main():
     """主函数"""
 
     # 读取数据 - 使用原始字符串避免转义问题
-    file_path = r"C:\Users\Raymond\Desktop\D data\pytjhon_test\double.xls"
+    file_path = r"C:\Users\Raymond\Desktop\D data\pytjhon_test\high.xls"
     df = read_and_process_data(file_path)
 
     if df is None:
@@ -448,10 +467,10 @@ def main():
 
     # 绘制饼图并获取分配比例
     print("生成投资比例饼图...")
-    stock_allocation = plot_investment_pie_chart(portfolio)
+    allocation, stock_allocation = plot_investment_pie_chart(portfolio)  # 接收两个返回值
 
     # 显示投资组合详情
-    display_portfolio_details(portfolio, stock_allocation)
+    display_portfolio_details(portfolio, allocation, stock_allocation)  # 传递两个参数
 
     # 显示整体统计数据
     print("\n" + "=" * 80)
@@ -464,7 +483,6 @@ def main():
 
     if all_stocks:
         # 计算平均值，忽略NaN值
-        # 使用标准化的列名 'PEG'
         peg_values = [s.get('PEG') for s in all_stocks if pd.notna(s.get('PEG'))]
         revenue_values = [s.get('最新年度營收增減(%)') for s in all_stocks if pd.notna(s.get('最新年度營收增減(%)'))]
         roe_values = [s.get('最新年度ROE(%)') for s in all_stocks if pd.notna(s.get('最新年度ROE(%)'))]

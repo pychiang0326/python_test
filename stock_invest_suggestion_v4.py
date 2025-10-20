@@ -430,18 +430,6 @@ def display_portfolio_details(portfolio, allocation, stock_allocation):
             print(f"  关键指标: {', '.join(key_metrics)}")
             print()
 
-
-
-def get_allocation_percentage(category):
-    """获取类别分配百分比"""
-    allocation_map = {
-        '核心持仓': 60,
-        '辅助持仓': 30,
-        '价值型持仓': 10
-    }
-    return allocation_map.get(category, 0)
-
-
 def main():
     """主函数"""
 

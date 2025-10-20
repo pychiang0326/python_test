@@ -174,7 +174,9 @@ def create_investment_portfolio(df):
             portfolio['科技成长股'] = tech_stocks
 
     # 识别生技医疗类股票
-    bio_stocks = df[df['產業別'].str.contains('生技|醫療', na=False)].copy()
+    #bio_stocks = df[df['產業別'].str.contains('生技|醫療|綠能', na=False)].copy()
+    bio_keywords = ['生技', '醫療', '綠能']
+    bio_stocks = df[df['產業別'].str.contains('|'.join(bio_keywords), na=False)].copy()
     if len(bio_stocks) > 0:
         bio_stocks = bio_stocks[((bio_stocks['PEG'] > 0) & (bio_stocks['PEG'] < 3)) | (bio_stocks['PEG'].isna())]
         if len(bio_stocks) > 0:
@@ -182,7 +184,7 @@ def create_investment_portfolio(df):
             portfolio['生技医疗'] = bio_stocks
 
     # 识别传统产业/价值股
-    value_keywords = ['鋼鐵', '塑膠', '橡膠', '建材', '紡織', '食品', '汽車', '貿易', '居家', '金控', '證劵', '銀行']
+    value_keywords = ['鋼鐵', '塑膠', '橡膠', '建材', '紡織', '食品', '汽車', '貿易', '居家', '金控', '證劵', '銀行', '油電']
     value_stocks = df[df['產業別'].str.contains('|'.join(value_keywords), na=False)].copy()
     if len(value_stocks) > 0:
         value_stocks = value_stocks[
@@ -444,7 +446,7 @@ def main():
     """主函数"""
 
     # 读取数据 - 使用原始字符串避免转义问题
-    file_path = r"C:\Users\Raymond\Desktop\D data\pytjhon_test\high.xls"
+    file_path = r"C:\Users\Raymond\Desktop\D data\pytjhon_test\stock.xls"
     df = read_and_process_data(file_path)
 
     if df is None:

@@ -163,16 +163,16 @@ def create_investment_portfolio(df):
     # 动态识别股票类别，基于数据中的实际股票代码
     portfolio = {}
 
-    # 识别半导体/科技类股票
-    tech_keywords = ['半導體', '電子', '電腦', '通信', '資訊', '光電']
-    tech_stocks = df[df['產業別'].str.contains('|'.join(tech_keywords), na=False)].copy()
-    if len(tech_stocks) > 0:
+    # 识别半导体/核心类股票
+    core_keywords = ['半導體', '電子', '電腦', '通信', '資訊', '光電']
+    core_stocks = df[df['產業別'].str.contains('|'.join(core_keywords), na=False)].copy()
+    if len(core_stocks) > 0:
         # 过滤PEG在合理范围内的股票
-        tech_stocks = tech_stocks[((tech_stocks['PEG'] > 0) & (tech_stocks['PEG'] < 3)) | (tech_stocks['PEG'].isna())]
-        if len(tech_stocks) > 0:
-            tech_stocks = tech_stocks.nlargest(min(5, len(tech_stocks)), '投资评分')
-            tech_stocks = tech_stocks[tech_stocks['投资评分'] > 0]
-            portfolio['科技成长股'] = tech_stocks
+        core_stocks = core_stocks[((core_stocks['PEG'] > 0) & (core_stocks['PEG'] < 3)) | (core_stocks['PEG'].isna())]
+        if len(core_stocks) > 0:
+            core_stocks = core_stocks.nlargest(min(5, len(core_stocks)), '投资评分')
+            core_stocks = core_stocks[core_stocks['投资评分'] > 0]
+            portfolio['核心成长股'] = core_stocks
 
     # 识别生技医疗类股票
     #bio_stocks = df[df['產業別'].str.contains('生技|醫療|綠能', na=False)].copy()
@@ -316,7 +316,7 @@ def plot_investment_pie_chart(portfolio):
         allocation[categories[1]] = 30
     elif len(categories) >= 3:
         # 主要类别分配较高权重
-        main_categories = [cat for cat in categories if '科技' in cat or '成长' in cat]
+        main_categories = [cat for cat in categories if '核心' in cat or '成长' in cat]
         if main_categories:
             allocation[main_categories[0]] = 50
             remaining_categories = [cat for cat in categories if cat not in main_categories]

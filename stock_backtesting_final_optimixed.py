@@ -272,7 +272,6 @@ def backtest_ma_cross_optimized(data, initial_cash=1000000):
         'trades': trades
     }
 
-
 def backtest_ma_cross_with_backtesting(data, initial_cash=1000000):
     """使用backtesting库回测移动平均线策略"""
     try:
@@ -283,29 +282,114 @@ def backtest_ma_cross_with_backtesting(data, initial_cash=1000000):
             def init(self):
                 self.ma1 = self.I(lambda x: pd.Series(x).rolling(self.n1).mean(), self.data.Close)
                 self.ma2 = self.I(lambda x: pd.Series(x).rolling(self.n2).mean(), self.data.Close)
+                # 添加一个变量来跟踪入场价格
+                self.entry_price = None
 
             def next(self):
+                # 获取当前价格
+                current_price = self.data.Close[-1]
+                current_time = self.data.index[-1]
+
                 if crossover(self.ma1, self.ma2):
                     if not self.position:
-                        price = self.data.Close[-1]
-                        if price > 0:
-                            investment = self.equity * 0.95
-                            shares = int(investment // price)
+                        if current_price > 0:
+                            # 使用95%的权益进行投资
+                            total_equity = self.equity
+                            investment = total_equity * 0.95
+                            shares = int(investment // current_price)
                             if shares > 0:
+                                # 记录入场价格
+                                self.entry_price = current_price
+                                # 打印买入交易信息
+                                print(f"📈 买入信号 - 时间: {current_time}, "
+                                      f"价格: {current_price:.2f}, 股数: {shares}, "
+                                      f"投资额: {investment:.2f}")
                                 self.buy(size=shares)
+
                 elif crossover(self.ma2, self.ma1):
                     if self.position:
+                        # 计算盈亏 - 使用我们记录的入场价格
+                        if self.entry_price is not None:
+                            profit_pct = (current_price / self.entry_price - 1) * 100
+                            profit_amount = (current_price - self.entry_price) * self.position.size
+
+                            # 打印卖出交易信息
+                            print(f"📉 卖出信号 - 时间: {current_time}, "
+                                  f"价格: {current_price:.2f}, 股数: {self.position.size}, "
+                                  f"入场价: {self.entry_price:.2f}, 盈亏: {profit_amount:.2f} ({profit_pct:.2f}%)")
+
+                            # 重置入场价格
+                            self.entry_price = None
+                        else:
+                            # 如果没有记录入场价格，只打印基本信息
+                            print(f"📉 卖出信号 - 时间: {current_time}, "
+                                  f"价格: {current_price:.2f}, 股数: {self.position.size}")
+
                         self.position.close()
 
         bt = Backtest(data, ImprovedMAStrategy, cash=initial_cash,
-                      commission=0.0015, exclusive_orders=True)
+                      commission=0.0015, exclusive_orders=True, finalize_trades=True)
         results = bt.run()
+
+        # 打印交易统计信息
+        print("\n" + "=" * 60)
+        print("📊 移动平均线策略交易统计汇总")
+        print("=" * 60)
+        print(f"初始资金: {initial_cash:,.2f}")
+        print(f"最终权益: {results['Equity Final [$]']:,.2f}")
+        print(f"总收益率: {results['Return [%]']:.2f}%")
+        print(f"年化收益率: {results['Return (Ann.) [%]']:.2f}%")
+        print(f"最大回撤: {results['Max. Drawdown [%]']:.2f}%")
+        print(f"总交易次数: {results['# Trades']}")
+
+        # 检查是否有胜率等指标
+        if 'Win Rate [%]' in results:
+            print(f"胜率: {results['Win Rate [%]']:.2f}%")
+        if 'Avg. Return [%]' in results:
+            print(f"平均收益率: {results['Avg. Return [%]']:.2f}%")
+        if 'Avg. Trade Duration' in results:
+            print(f"平均持仓时间: {results['Avg. Trade Duration']}")
+
+        # 打印详细的交易记录 - 使用更安全的方法
+        try:
+            trades_df = results._trades
+            if trades_df is not None and len(trades_df) > 0:
+                print(f"\n📋 详细交易记录 (共{len(trades_df)}笔):")
+                print("=" * 100)
+                for i, trade in trades_df.iterrows():
+                    entry_time = trade.get('EntryTime', 'N/A')
+                    exit_time = trade.get('ExitTime', 'N/A')
+                    entry_price = trade.get('EntryPrice', 0)
+                    exit_price = trade.get('ExitPrice', 0)
+                    size = trade.get('Size', 0)
+                    pnl = trade.get('PnL', 0)
+                    pnl_pct = trade.get('ReturnPct', 0) * 100
+
+                    duration = "N/A"
+                    if entry_time != 'N/A' and exit_time != 'N/A':
+                        try:
+                            duration_days = (exit_time - entry_time).days
+                            duration = f"{duration_days}天"
+                        except:
+                            pass
+
+                    print(f"交易 #{i + 1}:")
+                    print(f"  入场时间: {entry_time} | 入场价格: {entry_price:.2f}")
+                    print(f"  出场时间: {exit_time} | 出场价格: {exit_price:.2f}")
+                    print(f"  持仓天数: {duration} | 交易数量: {size}")
+                    print(f"  盈亏金额: {pnl:+.2f} | 盈亏比例: {pnl_pct:+.2f}%")
+                    print(f"  交易类型: {'做多' if size > 0 else '做空'}")
+                    print("-" * 100)
+            else:
+                print("\n⚠️ 没有交易记录")
+        except Exception as e:
+            print(f"\n无法获取详细交易记录: {e}")
 
         equity_curve = results._equity_curve
         portfolio_values = equity_curve['Equity'].tolist()
 
         # 检查结果是否合理
-        if results['Return [%]'] < 100:  # 如果收益率低于100%，可能有问题
+        if results['Return [%]'] < -50:  # 调整阈值，如果收益率低于-50%，可能有问题
             print("移动平均线策略回测结果不理想，使用改进的手动计算")
             return backtest_ma_cross_optimized(data, initial_cash)
 
@@ -319,9 +403,9 @@ def backtest_ma_cross_with_backtesting(data, initial_cash=1000000):
             'backtest_results': results
         }
     except Exception as e:
-        print(f"移动平均线策略回测错误，使用改进的手动计算: {e}")
+        print(f"移动平均线策略回测错误: {e}")
+        print("使用改进的手动计算")
         return backtest_ma_cross_optimized(data, initial_cash)
-
 
 def backtest_buy_hold_with_backtesting(data, initial_cash=1000000):
     """使用backtesting库回测买入持有策略"""

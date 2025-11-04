@@ -348,8 +348,8 @@ def main():
     """
     主函数
     """
-    stack_code = "2891.TW"
-    #stack_code = "2330.TW"
+    #stack_code = "2891.TW"
+    stack_code = "2330.TW"
     # 设置时间范围（近10年）
     years = 10
     end_date = datetime.now()
@@ -369,12 +369,12 @@ def main():
 
         # 计算移动平均线和信号
         # 強勢個股：2330
-        # strategy = 1
-        # stock_with_ma, buy_signals, sell_signals = calculate_ma_signals(stock)
+        strategy = 1
+        stock_with_ma, buy_signals, sell_signals = calculate_ma_signals(stock)
 
-        # 金融股：2891 採均值回歸策略
-        strategy = 2
-        stock_with_ma, buy_signals, sell_signals = mean_reversion_strategy(stock)
+        # # 金融股：2891 採均值回歸策略
+        # strategy = 2
+        # stock_with_ma, buy_signals, sell_signals = mean_reversion_strategy(stock)
 
         # 打印信号统计
         print(f"\n信号统计：")

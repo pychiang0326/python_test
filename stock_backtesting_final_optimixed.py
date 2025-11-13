@@ -609,7 +609,7 @@ def backtest_monthly_dca_strategy(data, monthly_investment=10000, transaction_co
 def simple_stock_analysis():
     set_chinese_font()
 
-    stock_code = "2330.TW"
+    stock_code = "2383.TW"
     years = 10
     end_date = datetime.now()
     start_date = end_date - timedelta(days=365 * years)
@@ -749,7 +749,7 @@ def simple_stock_analysis():
         print("✓ 适合喜欢主动管理且能接受频繁交易的投资者")
 
     print(f"\n策略表现总结:")
-    print(f"- 台积电在过去10年股价上涨了{price_return:.1f}%")
+    print(f"- {stock_code}在过去10年股价上涨了{price_return:.1f}%")
     print(f"- {best_strategy[0]}在风险调整后表现最佳")
     print(f"- 图表已保存为: {chart_filename}")
 

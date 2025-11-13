@@ -274,6 +274,571 @@ def mean_reversion_strategy(stock_data):
 
     return df, buy_signals, sell_signals
 
+
+def strict_light_filter_ma_signals(stock_data):
+    """
+    严格的轻量级过滤策略
+    """
+    df = calculate_technical_indicators(stock_data)
+
+    holding = False
+    buy_signals = []
+    sell_signals = []
+    filtered_count = 0
+
+    for i in range(200, len(df)):
+        # ... 前面代码相同 ...
+        date = df.index[i]
+        close_price = df['Close'].iloc[i]
+        ma5 = df['MA5'].iloc[i]
+        ma20 = df['MA20'].iloc[i]
+        ma60 = df['MA60'].iloc[i]
+        ma200 = df['MA200'].iloc[i]
+        rsi = df['RSI'].iloc[i]
+        bb_upper = df['BB_Upper'].iloc[i]
+        macd = df['MACD'].iloc[i]
+
+        ma5_prev = df['MA5'].iloc[i - 1]
+        ma20_prev = df['MA20'].iloc[i - 1]
+        ma60_prev = df['MA60'].iloc[i - 1]
+
+        golden_cross_5_20 = (ma5 > ma20) and (ma5_prev <= ma20_prev)
+        death_cross_20_60 = (ma20 < ma60) and (ma20_prev >= ma60_prev)
+
+        base_condition = golden_cross_5_20 and close_price > ma200
+        if base_condition and not holding:
+            # 更严格的过滤条件
+            extremely_overbought = rsi > 70  # 收紧到70
+            moderately_overbought = rsi > 65  # 收紧到65
+            above_bb = close_price > bb_upper * 1.02  # 超过上轨2%
+            macd_bearish = macd < 0  # MACD为负
+            below_200ma = close_price < ma200 * 0.98  # 低于200MA 2%
+
+            # 使用更严格的组合条件
+            filter_conditions = [
+                extremely_overbought,
+                moderately_overbought and above_bb,
+                macd_bearish and below_200ma,
+                rsi < 30,  # 新增：避免在超卖时买入
+                macd < df['MACD_Signal'].iloc[i]  # 新增：MACD在信号线下方
+            ]
+
+            should_filter = any(filter_conditions)
+
+            if not should_filter:
+                buy_signals.append((date, close_price))
+                holding = True
+            else:
+                filtered_count += 1
+                # 打印被过滤的原因（调试用）
+                if extremely_overbought:
+                    print(f"过滤原因: RSI过高 {rsi:.1f}")
+                elif moderately_overbought and above_bb:
+                    print(f"过滤原因: RSI中等超买且突破布林带 RSI:{rsi:.1f}")
+                elif macd_bearish and below_200ma:
+                    print(f"过滤原因: MACD看跌且低于200MA MACD:{macd:.3f}")
+
+        elif death_cross_20_60 and holding:
+            sell_signals.append((date, close_price))
+            holding = False
+
+    print(f"严格轻量级过滤：过滤掉了 {filtered_count} 个买入信号")
+    return df, buy_signals, sell_signals
+
+
+def enhanced_light_filter_ma_signals(stock_data):
+    """
+    增强版轻量级过滤策略 - 基于回测结果优化
+    """
+    df = calculate_technical_indicators(stock_data)
+
+    holding = False
+    buy_signals = []
+    sell_signals = []
+    filtered_count = 0
+
+    for i in range(200, len(df)):
+        date = df.index[i]
+        close_price = df['Close'].iloc[i]
+        ma5 = df['MA5'].iloc[i]
+        ma20 = df['MA20'].iloc[i]
+        ma60 = df['MA60'].iloc[i]
+        ma200 = df['MA200'].iloc[i]
+        rsi = df['RSI'].iloc[i]
+        bb_upper = df['BB_Upper'].iloc[i]
+        bb_lower = df['BB_Lower'].iloc[i]
+        macd = df['MACD'].iloc[i]
+        macd_signal = df['MACD_Signal'].iloc[i]
+        volume = df['Volume'].iloc[i]
+        avg_volume = df['Volume'].rolling(20).mean().iloc[i]
+
+        ma5_prev = df['MA5'].iloc[i - 1]
+        ma20_prev = df['MA20'].iloc[i - 1]
+        ma60_prev = df['MA60'].iloc[i - 1]
+
+        golden_cross_5_20 = (ma5 > ma20) and (ma5_prev <= ma20_prev)
+        death_cross_20_60 = (ma20 < ma60) and (ma20_prev >= ma60_prev)
+
+        base_condition = golden_cross_5_20 and close_price > ma200
+
+        if base_condition and not holding:
+            # 基于回测结果的优化条件
+            conditions = {
+                'rsi_overbought': rsi > 72,  # 适度超买
+                'rsi_oversold': rsi < 38,  # 适度超卖
+                'above_bb': close_price > bb_upper * 1.01,  # 略高于布林带上轨
+                'below_bb': close_price < bb_lower * 0.99,  # 略低于布林带下轨
+                'macd_bearish': macd < macd_signal,  # MACD在信号线下方
+                'low_volume': volume < avg_volume * 0.8,  # 成交量不足
+                'high_volatility': df['Volatility'].iloc[i] > 0.03,  # 高波动期
+                'weak_trend': df['Trend_Strength'].iloc[i] < 0.05,  # 趋势过弱
+            }
+
+            # 计分系统：满足2个以上条件就过滤
+            filter_score = sum(conditions.values())
+
+            if filter_score >= 2:
+                filtered_count += 1
+                if filtered_count <= 5:  # 只打印前5个过滤原因
+                    reasons = [key for key, value in conditions.items() if value]
+                    print(f"过滤原因: {', '.join(reasons)} (RSI: {rsi:.1f}, MACD: {macd:.3f})")
+            else:
+                buy_signals.append((date, close_price))
+                holding = True
+
+        elif death_cross_20_60 and holding:
+            sell_signals.append((date, close_price))
+            holding = False
+
+    print(f"增强版轻量级过滤：过滤掉了 {filtered_count} 个买入信号")
+    return df, buy_signals, sell_signals
+
+
+def conservative_filter_ma_signals(stock_data):
+    """
+    保守过滤策略 - 只过滤最危险的信号
+    """
+    df = calculate_technical_indicators(stock_data)
+
+    holding = False
+    buy_signals = []
+    sell_signals = []
+    filtered_count = 0
+
+    for i in range(200, len(df)):
+        date = df.index[i]
+        close_price = df['Close'].iloc[i]
+        ma5 = df['MA5'].iloc[i]
+        ma20 = df['MA20'].iloc[i]
+        ma60 = df['MA60'].iloc[i]
+        ma200 = df['MA200'].iloc[i]
+        rsi = df['RSI'].iloc[i]
+        bb_upper = df['BB_Upper'].iloc[i]
+        macd = df['MACD'].iloc[i]
+
+        ma5_prev = df['MA5'].iloc[i - 1]
+        ma20_prev = df['MA20'].iloc[i - 1]
+        ma60_prev = df['MA60'].iloc[i - 1]
+
+        golden_cross_5_20 = (ma5 > ma20) and (ma5_prev <= ma20_prev)
+        death_cross_20_60 = (ma20 < ma60) and (ma20_prev >= ma60_prev)
+
+        base_condition = golden_cross_5_20 and close_price > ma200
+
+        if base_condition and not holding:
+            # 只过滤最危险的3种情况
+            extremely_overbought = rsi > 82  # 比之前更严格
+            extreme_breakout = close_price > bb_upper * 1.10  # 突破过多
+            severe_downtrend = close_price < ma200 * 0.80  # 严重下跌趋势
+
+            should_filter = any([
+                extremely_overbought,
+                extreme_breakout,
+                severe_downtrend
+            ])
+
+            if not should_filter:
+                buy_signals.append((date, close_price))
+                holding = True
+            else:
+                filtered_count += 1
+                if extremely_overbought:
+                    print(f"保守过滤: RSI极端超买({rsi:.1f})")
+                elif extreme_breakout:
+                    print(f"保守过滤: 突破过多({close_price:.2f} > {bb_upper:.2f})")
+                elif severe_downtrend:
+                    print(f"保守过滤: 严重下跌趋势({close_price:.2f} < {ma200:.2f})")
+
+        elif death_cross_20_60 and holding:
+            sell_signals.append((date, close_price))
+            holding = False
+
+    print(f"保守过滤：过滤掉了 {filtered_count} 个危险信号")
+    return df, buy_signals, sell_signals
+
+
+def pattern_based_filter_ma_signals(stock_data):
+    """
+    基于历史模式过滤 - 分析过去类似信号的表现
+    """
+    df = calculate_technical_indicators(stock_data)
+
+    holding = False
+    buy_signals = []
+    sell_signals = []
+    filtered_count = 0
+
+    for i in range(200, len(df)):
+        date = df.index[i]
+        close_price = df['Close'].iloc[i]
+        ma5 = df['MA5'].iloc[i]
+        ma20 = df['MA20'].iloc[i]
+        ma60 = df['MA60'].iloc[i]
+        ma200 = df['MA200'].iloc[i]
+        rsi = df['RSI'].iloc[i]
+        bb_upper = df['BB_Upper'].iloc[i]
+        bb_lower = df['BB_Lower'].iloc[i]
+        macd = df['MACD'].iloc[i]
+        macd_signal = df['MACD_Signal'].iloc[i]
+        volume = df['Volume'].iloc[i]
+        avg_volume = df['Volume'].rolling(20).mean().iloc[i]
+
+        ma5_prev = df['MA5'].iloc[i - 1]
+        ma20_prev = df['MA20'].iloc[i - 1]
+        ma60_prev = df['MA60'].iloc[i - 1]
+
+        golden_cross_5_20 = (ma5 > ma20) and (ma5_prev <= ma20_prev)
+        death_cross_20_60 = (ma20 < ma60) and (ma20_prev >= ma60_prev)
+
+        base_condition = golden_cross_5_20 and close_price > ma200
+
+        if base_condition and not holding:
+            # 基于历史表现的模式过滤
+            conditions = {
+                'weak_volume_momentum': volume < avg_volume * 0.9 and df['Volume'].iloc[i - 1] < avg_volume * 0.9,
+                'rsi_divergence': rsi < 45 and close_price > df['Close'].iloc[i - 20] * 1.05,  # 价格新高但RSI不高
+                'macd_weakness': macd < 0 or macd < macd_signal,
+                'volatility_squeeze': (bb_upper - bb_lower) / bb_lower < 0.05,  # 布林带收窄
+                'distance_from_ma200': close_price > ma200 * 1.15,  # 离200MA太远
+            }
+
+            # 计分系统：2分以上过滤
+            filter_score = sum(conditions.values())
+
+            if filter_score >= 2:
+                filtered_count += 1
+                reasons = [key for key, value in conditions.items() if value]
+                print(f"模式过滤: {', '.join(reasons)} (分数: {filter_score})")
+            else:
+                buy_signals.append((date, close_price))
+                holding = True
+
+        elif death_cross_20_60 and holding:
+            sell_signals.append((date, close_price))
+            holding = False
+
+    print(f"模式过滤：过滤掉了 {filtered_count} 个信号")
+    return df, buy_signals, sell_signals
+
+
+def risk_adjusted_position_strategy(stock_data):
+    """
+    风险调整仓位策略 - 不过滤信号，但根据风险调整仓位大小
+    """
+    df = calculate_technical_indicators(stock_data)
+
+    holding = False
+    buy_signals = []  # 存储(日期, 价格, 仓位权重)
+    sell_signals = []  # 存储(日期, 价格)
+    position_sizes = []  # 记录每次交易的仓位大小
+
+    for i in range(200, len(df)):
+        date = df.index[i]
+        close_price = df['Close'].iloc[i]
+        ma5 = df['MA5'].iloc[i]
+        ma20 = df['MA20'].iloc[i]
+        ma60 = df['MA60'].iloc[i]
+        ma200 = df['MA200'].iloc[i]
+        rsi = df['RSI'].iloc[i]
+        volume = df['Volume'].iloc[i]
+        avg_volume = df['Volume'].rolling(20).mean().iloc[i]
+        macd = df['MACD'].iloc[i]
+        macd_signal = df['MACD_Signal'].iloc[i]
+
+        ma5_prev = df['MA5'].iloc[i - 1]
+        ma20_prev = df['MA20'].iloc[i - 1]
+        ma60_prev = df['MA60'].iloc[i - 1]
+
+        golden_cross_5_20 = (ma5 > ma20) and (ma5_prev <= ma20_prev)
+        death_cross_20_60 = (ma20 < ma60) and (ma20_prev >= ma60_prev)
+
+        base_condition = golden_cross_5_20 and close_price > ma200
+
+        if base_condition and not holding:
+            # 计算风险分数和推荐仓位
+            risk_factors = [
+                rsi > 70,  # 超买风险
+                volume < avg_volume * 0.8,  # 低成交量风险
+                close_price > ma200 * 1.15,  # 高位风险
+                macd < macd_signal,  # MACD弱势风险
+                df['Volatility'].iloc[i] > 0.03,  # 高波动风险
+            ]
+
+            risk_score = sum(risk_factors)
+
+            # 根据风险调整仓位（1.0 = 满仓，0.5 = 半仓，等等）
+            if risk_score == 0:
+                position_size = 1.0  # 无风险，满仓
+                risk_level = "低风险"
+            elif risk_score == 1:
+                position_size = 0.8  # 轻度风险，80%仓位
+                risk_level = "中低风险"
+            elif risk_score == 2:
+                position_size = 0.6  # 中度风险，60%仓位
+                risk_level = "中风险"
+            elif risk_score >= 3:
+                position_size = 0.4  # 高风险，40%仓位
+                risk_level = "高风险"
+
+            buy_signals.append((date, close_price, position_size))
+            position_sizes.append(position_size)
+            holding = True
+
+            print(f"仓位调整: {risk_level}, 仓位={position_size * 100}%, 风险分数={risk_score}")
+
+        elif death_cross_20_60 and holding:
+            # 卖出信号保持传统格式 (日期, 价格)
+            sell_signals.append((date, close_price))
+            holding = False
+
+    print(
+        f"风险调整策略: 平均仓位大小 = {np.mean(position_sizes) * 100:.1f}%" if position_sizes else "风险调整策略: 无交易")
+    return df, buy_signals, sell_signals
+
+
+def refined_risk_adjusted_strategy(stock_data):
+    """
+    精细化风险调整策略 - 基于回测结果优化仓位映射
+    """
+    df = calculate_technical_indicators(stock_data)
+
+    holding = False
+    buy_signals = []
+    sell_signals = []
+    position_sizes = []
+
+    for i in range(200, len(df)):
+        date = df.index[i]
+        close_price = df['Close'].iloc[i]
+        ma5 = df['MA5'].iloc[i]
+        ma20 = df['MA20'].iloc[i]
+        ma60 = df['MA60'].iloc[i]
+        ma200 = df['MA200'].iloc[i]
+        rsi = df['RSI'].iloc[i]
+        volume = df['Volume'].iloc[i]
+        avg_volume = df['Volume'].rolling(20).mean().iloc[i]
+        macd = df['MACD'].iloc[i]
+        macd_signal = df['MACD_Signal'].iloc[i]
+        bb_upper = df['BB_Upper'].iloc[i]
+        bb_lower = df['BB_Lower'].iloc[i]
+
+        ma5_prev = df['MA5'].iloc[i - 1]
+        ma20_prev = df['MA20'].iloc[i - 1]
+        ma60_prev = df['MA60'].iloc[i - 1]
+
+        golden_cross_5_20 = (ma5 > ma20) and (ma5_prev <= ma20_prev)
+        death_cross_20_60 = (ma20 < ma60) and (ma20_prev >= ma60_prev)
+
+        base_condition = golden_cross_5_20 and close_price > ma200
+
+        if base_condition and not holding:
+            # 更精细的风险评估
+            risk_factors = {
+                'rsi_risk': max(0, (rsi - 50) / 30),  # RSI偏离度风险
+                'volume_risk': max(0, 0.8 - volume / avg_volume),  # 成交量不足风险
+                'position_risk': max(0, (close_price / ma200 - 1.1) / 0.5),  # 高位风险
+                'macd_risk': max(0, (macd_signal - macd) / 2),  # MACD弱势风险
+                'volatility_risk': min(1, df['Volatility'].iloc[i] / 0.04),  # 波动风险
+                'bb_position_risk': max(0, (close_price - bb_lower) / (bb_upper - bb_lower) - 0.8) * 5,  # 布林带位置风险
+            }
+
+            # 综合风险分数（0-1）
+            total_risk_score = min(1, sum(risk_factors.values()) / 3)
+
+            # 更平滑的仓位映射
+            if total_risk_score <= 0.2:
+                position_size = 1.0  # 极低风险，满仓
+                risk_level = "极低风险"
+            elif total_risk_score <= 0.4:
+                position_size = 0.9  # 低风险，90%仓位
+                risk_level = "低风险"
+            elif total_risk_score <= 0.6:
+                position_size = 0.75  # 中风险，75%仓位
+                risk_level = "中风险"
+            elif total_risk_score <= 0.8:
+                position_size = 0.6  # 高风险，60%仓位
+                risk_level = "高风险"
+            else:
+                position_size = 0.4  # 极高风险，40%仓位
+                risk_level = "极高风险"
+
+            buy_signals.append((date, close_price, position_size))
+            position_sizes.append(position_size)
+            holding = True
+
+            print(f"精细调整: {risk_level}, 仓位={position_size * 100}%, 风险分数={total_risk_score:.2f}")
+
+        elif death_cross_20_60 and holding:
+            sell_signals.append((date, close_price))
+            holding = False
+
+    avg_position = np.mean(position_sizes) * 100 if position_sizes else 0
+    print(f"精细化风险调整: 平均仓位大小 = {avg_position:.1f}%")
+    return df, buy_signals, sell_signals
+
+
+def simplified_risk_adjustment(stock_data):
+    """
+    简化但有效的风险调整策略 - 基于历史表现优化
+    """
+    df = calculate_technical_indicators(stock_data)
+
+    holding = False
+    buy_signals = []
+    sell_signals = []
+    position_sizes = []
+
+    for i in range(200, len(df)):
+        date = df.index[i]
+        close_price = df['Close'].iloc[i]
+        ma5 = df['MA5'].iloc[i]
+        ma20 = df['MA20'].iloc[i]
+        ma60 = df['MA60'].iloc[i]
+        ma200 = df['MA200'].iloc[i]
+        rsi = df['RSI'].iloc[i]
+        volume = df['Volume'].iloc[i]
+        avg_volume = df['Volume'].rolling(20).mean().iloc[i]
+        macd = df['MACD'].iloc[i]
+
+        ma5_prev = df['MA5'].iloc[i - 1]
+        ma20_prev = df['MA20'].iloc[i - 1]
+        ma60_prev = df['MA60'].iloc[i - 1]
+
+        golden_cross_5_20 = (ma5 > ma20) and (ma5_prev <= ma20_prev)
+        death_cross_20_60 = (ma20 < ma60) and (ma20_prev >= ma60_prev)
+
+        base_condition = golden_cross_5_20 and close_price > ma200
+
+        if base_condition and not holding:
+            # 基于历史回测结果的简化调整
+            # 只使用最有效的3个风险因子
+            risk_factors = [
+                rsi > 70,  # RSI超买
+                volume < avg_volume * 0.85,  # 成交量不足
+                close_price > ma200 * 1.12,  # 位置过高
+            ]
+
+            risk_score = sum(risk_factors)
+
+            # 基于历史优化的仓位映射
+            if risk_score == 0:
+                position_size = 1.0  # 无风险，满仓
+                risk_level = "优质"
+            elif risk_score == 1:
+                position_size = 0.7  # 轻度风险，70%仓位
+                risk_level = "良好"
+            elif risk_score == 2:
+                position_size = 0.5  # 中度风险，50%仓位
+                risk_level = "谨慎"
+            else:  # risk_score == 3
+                position_size = 0.3  # 高度风险，30%仓位
+                risk_level = "高风险"
+
+            buy_signals.append((date, close_price, position_size))
+            position_sizes.append(position_size)
+            holding = True
+
+            print(f"简化调整: {risk_level}, 仓位={position_size * 100}%, 风险分数={risk_score}")
+
+        elif death_cross_20_60 and holding:
+            sell_signals.append((date, close_price))
+            holding = False
+
+    avg_position = np.mean(position_sizes) * 100 if position_sizes else 0
+    print(f"简化风险调整: 平均仓位大小 = {avg_position:.1f}%")
+    return df, buy_signals, sell_signals
+
+
+def final_simplified_risk_strategy(stock_data):
+    """
+    最终版简化风险调整策略 - 基于所有测试结果优化
+    """
+    df = calculate_technical_indicators(stock_data)
+
+    holding = False
+    buy_signals = []
+    sell_signals = []
+    position_sizes = []
+
+    for i in range(200, len(df)):
+        date = df.index[i]
+        close_price = df['Close'].iloc[i]
+        ma5 = df['MA5'].iloc[i]
+        ma20 = df['MA20'].iloc[i]
+        ma60 = df['MA60'].iloc[i]
+        ma200 = df['MA200'].iloc[i]
+        rsi = df['RSI'].iloc[i]
+        volume = df['Volume'].iloc[i]
+        avg_volume = df['Volume'].rolling(20).mean().iloc[i]
+        macd = df['MACD'].iloc[i]
+
+        ma5_prev = df['MA5'].iloc[i - 1]
+        ma20_prev = df['MA20'].iloc[i - 1]
+        ma60_prev = df['MA60'].iloc[i - 1]
+
+        golden_cross_5_20 = (ma5 > ma20) and (ma5_prev <= ma20_prev)
+        death_cross_20_60 = (ma20 < ma60) and (ma20_prev >= ma60_prev)
+
+        base_condition = golden_cross_5_20 and close_price > ma200
+
+        if base_condition and not holding:
+            # 最终优化的风险因子
+            risk_factors = [
+                rsi > 72,  # RSI超买
+                volume < avg_volume * 0.8,  # 成交量不足
+                close_price > ma200 * 1.15,  # 位置过高
+            ]
+
+            risk_score = sum(risk_factors)
+
+            # 最终优化的仓位映射
+            if risk_score == 0:
+                position_size = 1.0  # 无风险，满仓
+                risk_level = "优质"
+            elif risk_score == 1:
+                position_size = 0.75  # 轻度风险，75%仓位
+                risk_level = "良好"
+            elif risk_score == 2:
+                position_size = 0.5  # 中度风险，50%仓位
+                risk_level = "谨慎"
+            else:  # risk_score == 3
+                position_size = 0.25  # 高度风险，25%仓位
+                risk_level = "高风险"
+
+            buy_signals.append((date, close_price, position_size))
+            position_sizes.append(position_size)
+            holding = True
+
+            print(f"最终策略: {risk_level}, 仓位={position_size * 100}%, 风险分数={risk_score}")
+
+        elif death_cross_20_60 and holding:
+            sell_signals.append((date, close_price))
+            holding = False
+
+    avg_position = np.mean(position_sizes) * 100 if position_sizes else 0
+    print(f"最终简化风险策略: 平均仓位大小 = {avg_position:.1f}%")
+    return df, buy_signals, sell_signals
+
 def adaptive_ma_signals(stock_data):
     """
     真正自适应的策略 - 确保与无过滤策略不同
@@ -331,99 +896,198 @@ def adaptive_ma_signals(stock_data):
 
     return df, buy_signals, sell_signals
 
+
+def improved_adaptive_ma_signals(stock_data):
+    """
+    改进的自适应策略
+    """
+    df = calculate_technical_indicators(stock_data)
+
+    holding = False
+    buy_signals = []
+    sell_signals = []
+
+    for i in range(200, len(df)):
+        date = df.index[i]
+        close_price = df['Close'].iloc[i]
+        ma5 = df['MA5'].iloc[i]
+        ma20 = df['MA20'].iloc[i]
+        ma60 = df['MA60'].iloc[i]
+        ma200 = df['MA200'].iloc[i]
+        rsi = df['RSI'].iloc[i]
+        trend_strength = df['Trend_Strength'].iloc[i]
+        volatility = df['Volatility'].iloc[i]
+        macd = df['MACD'].iloc[i]
+        macd_signal = df['MACD_Signal'].iloc[i]
+
+        ma5_prev = df['MA5'].iloc[i - 1]
+        ma20_prev = df['MA20'].iloc[i - 1]
+        ma60_prev = df['MA60'].iloc[i - 1]
+
+        golden_cross_5_20 = (ma5 > ma20) and (ma5_prev <= ma20_prev)
+        death_cross_20_60 = (ma20 < ma60) and (ma20_prev >= ma60_prev)
+
+        if golden_cross_5_20 and close_price > ma200 and not holding:
+            # 改进的自适应逻辑
+            market_condition = "normal"
+
+            if trend_strength > 0.2:  # 强势趋势
+                market_condition = "strong_trend"
+                # 在强势趋势中，允许更高的RSI
+                if rsi < 75 and macd > macd_signal and close_price > ma200 * 1.02:
+                    buy_signals.append((date, close_price))
+                    holding = True
+
+            elif volatility > 0.025:  # 高波动
+                market_condition = "high_volatility"
+                # 高波动市场中要求更好的位置
+                if 35 < rsi < 65 and close_price > ma200 * 1.05:
+                    buy_signals.append((date, close_price))
+                    holding = True
+
+            else:  # 正常市场
+                market_condition = "normal"
+                # 正常市场适度过滤
+                if 40 < rsi < 70 and macd > -1.0:
+                    buy_signals.append((date, close_price))
+                    holding = True
+
+        elif death_cross_20_60 and holding:
+            sell_signals.append((date, close_price))
+            holding = False
+
+    return df, buy_signals, sell_signals
+
 def backtest_analysis(buy_signals, sell_signals, strategy_name="策略"):
     """
-    回测分析和统计
+    回测分析和统计 - 支持带仓位权重的信号
     """
     print(f"\n" + "=" * 60)
     print(f"{strategy_name} - 回测统计分析")
     print("=" * 60)
 
+    # 检查信号格式并提取基本信息
+    if len(buy_signals) > 0 and len(buy_signals[0]) == 3:
+        # 带仓位权重的信号格式 (日期, 价格, 仓位权重)
+        buy_dates = [signal[0] for signal in buy_signals]
+        buy_prices = [signal[1] for signal in buy_signals]
+        position_sizes = [signal[2] for signal in buy_signals]
+        has_position_sizing = True
+    else:
+        # 传统信号格式 (日期, 价格)
+        buy_dates = [signal[0] for signal in buy_signals]
+        buy_prices = [signal[1] for signal in buy_signals]
+        position_sizes = [1.0] * len(buy_signals)  # 默认满仓
+        has_position_sizing = False
+
     # 确保买卖信号数量匹配
-    min_signals = min(len(buy_signals), len(sell_signals))
-    buy_signals = buy_signals[:min_signals]
+    min_signals = min(len(buy_dates), len(sell_signals))
+    buy_dates = buy_dates[:min_signals]
+    buy_prices = buy_prices[:min_signals]
+    position_sizes = position_sizes[:min_signals]
     sell_signals = sell_signals[:min_signals]
 
     if min_signals == 0:
         print("没有完整的交易对进行回测分析")
         return None, None, None
 
-    # 计算每笔交易的收益率
+    # 计算每笔交易的收益率（考虑仓位权重）
     trades = []
     total_return = 1.0
     cumulative_returns = []
+    total_investment = 0
+    total_profit = 0
 
     for i in range(min_signals):
-        buy_date, buy_price = buy_signals[i]
+        buy_date = buy_dates[i]
+        buy_price = buy_prices[i]
+        position_size = position_sizes[i]
         sell_date, sell_price = sell_signals[i]
 
         holding_days = (sell_date - buy_date).days
-        return_rate = (sell_price - buy_price) / buy_price * 100
-        profit = sell_price - buy_price
+        raw_return_rate = (sell_price - buy_price) / buy_price * 100
+        adjusted_return_rate = raw_return_rate * position_size  # 按仓位调整收益率
+        profit = (sell_price - buy_price) * position_size  # 按仓位调整盈亏
 
         trade_info = {
             '序号': i + 1,
             '买入日期': buy_date.strftime('%Y-%m-%d'),
             '买入价格': buy_price,
+            '仓位权重': position_size,
             '卖出日期': sell_date.strftime('%Y-%m-%d'),
             '卖出价格': sell_price,
             '持有天数': holding_days,
-            '收益率%': return_rate,
+            '原始收益率%': raw_return_rate,
+            '调整后收益率%': adjusted_return_rate,
             '盈亏金额': profit
         }
         trades.append(trade_info)
 
-        total_return *= (1 + return_rate / 100)
+        total_return *= (1 + adjusted_return_rate / 100)
         cumulative_returns.append((total_return - 1) * 100)
+        total_investment += buy_price * position_size
+        total_profit += profit
 
     # 计算统计指标
-    returns = [trade['收益率%'] for trade in trades]
+    returns = [trade['调整后收益率%'] for trade in trades]
+    raw_returns = [trade['原始收益率%'] for trade in trades]
     profits = [trade['盈亏金额'] for trade in trades]
     holding_periods = [trade['持有天数'] for trade in trades]
+    position_weights = [trade['仓位权重'] for trade in trades]
 
     # 基本统计
     total_trades = len(trades)
     winning_trades = len([r for r in returns if r > 0])
     losing_trades = len([r for r in returns if r < 0])
-    win_rate = winning_trades / total_trades * 100
+    win_rate = winning_trades / total_trades * 100 if total_trades > 0 else 0
 
-    avg_return = np.mean(returns)
-    max_return = np.max(returns)
-    min_return = np.min(returns)
+    avg_return = np.mean(returns) if returns else 0
+    max_return = np.max(returns) if returns else 0
+    min_return = np.min(returns) if returns else 0
 
-    total_profit = sum(profits)
-    avg_profit = np.mean(profits)
-    avg_holding_days = np.mean(holding_periods)
+    avg_raw_return = np.mean(raw_returns) if raw_returns else 0
+    avg_position_size = np.mean(position_weights) if position_weights else 0
+    avg_holding_days = np.mean(holding_periods) if holding_periods else 0
 
     # 年化收益率
-    first_buy_date = datetime.strptime(trades[0]['买入日期'], '%Y-%m-%d')
-    last_sell_date = datetime.strptime(trades[-1]['卖出日期'], '%Y-%m-%d')
-    total_days = (last_sell_date - first_buy_date).days
-    total_years = total_days / 365.25
-    annualized_return = (total_return ** (1 / total_years) - 1) * 100 if total_years > 0 else 0
+    if trades:
+        first_buy_date = datetime.strptime(trades[0]['买入日期'], '%Y-%m-%d')
+        last_sell_date = datetime.strptime(trades[-1]['卖出日期'], '%Y-%m-%d')
+        total_days = (last_sell_date - first_buy_date).days
+        total_years = total_days / 365.25
+        annualized_return = (total_return ** (1 / total_years) - 1) * 100 if total_years > 0 else 0
+    else:
+        annualized_return = 0
 
     # 最大回撤计算
     equity_curve = [1.0]
     for ret in returns:
         equity_curve.append(equity_curve[-1] * (1 + ret / 100))
 
-    running_max = np.maximum.accumulate(equity_curve)
-    drawdowns = (equity_curve - running_max) / running_max * 100
-    max_drawdown = np.min(drawdowns)
+    if len(equity_curve) > 1:
+        running_max = np.maximum.accumulate(equity_curve)
+        drawdowns = (equity_curve - running_max) / running_max * 100
+        max_drawdown = np.min(drawdowns) if len(drawdowns) > 0 else 0
+    else:
+        max_drawdown = 0
 
     # 打印统计摘要
     print(f"总交易次数: {total_trades}")
+    if has_position_sizing:
+        print(f"平均仓位大小: {avg_position_size*100:.1f}%")
     print(f"盈利交易: {winning_trades}次")
     print(f"亏损交易: {losing_trades}次")
     print(f"胜率: {win_rate:.2f}%")
     print(f"平均持有天数: {avg_holding_days:.1f}天")
     print(f"单次交易平均收益率: {avg_return:.2f}%")
+    if has_position_sizing:
+        print(f"原始平均收益率: {avg_raw_return:.2f}%")
     print(f"最佳单次收益率: {max_return:.2f}%")
     print(f"最差单次收益率: {min_return:.2f}%")
     print(f"累计总收益率: {(total_return - 1) * 100:.2f}%")
     print(f"年化收益率: {annualized_return:.2f}%")
     print(f"总盈亏金额: {total_profit:.2f} TWD")
-    print(f"平均每笔盈亏: {avg_profit:.2f} TWD")
+    print(f"平均每笔盈亏: {np.mean(profits):.2f} TWD" if profits else "平均每笔盈亏: 0.00 TWD")
     print(f"最大回撤: {max_drawdown:.2f}%")
 
     # 返回统计信息
@@ -432,11 +1096,12 @@ def backtest_analysis(buy_signals, sell_signals, strategy_name="策略"):
         'win_rate': win_rate,
         'total_return': (total_return - 1) * 100,
         'annualized_return': annualized_return,
-        'max_drawdown': max_drawdown
+        'max_drawdown': max_drawdown,
+        'avg_position_size': avg_position_size,
+        'has_position_sizing': has_position_sizing
     }
 
     return stats, trades, cumulative_returns
-
 
 def compare_strategies(stock_data):
     """
@@ -448,16 +1113,14 @@ def compare_strategies(stock_data):
     df1, buy1, sell1 = no_filter_ma_signals(stock_data)
     stats1, trades1, cum_ret1 = backtest_analysis(buy1, sell1, "无过滤策略")
 
-    # 策略2: 轻量级过滤策略
-    #df2, buy2, sell2 = light_filter_ma_signals(stock_data)
-    #df2, buy2, sell2 = optimized_light_filter_ma_signals(stock_data)
-    # 金融股：均值回歸策略
-    df2, buy2, sell2 = mean_reversion_strategy(stock_data)
-    stats2, trades2, cum_ret2 = backtest_analysis(buy2, sell2, "轻量级过滤策略")
+    # 策略2: 使用方案1的模式过滤策略
+    df2, buy2, sell2 = pattern_based_filter_ma_signals(stock_data)
+    stats2, trades2, cum_ret2 = backtest_analysis(buy2, sell2, "模式过滤策略")
 
-    # 策略3: 自适应策略
-    df3, buy3, sell3 = adaptive_ma_signals(stock_data)
-    stats3, trades3, cum_ret3 = backtest_analysis(buy3, sell3, "自适应策略")
+    # 策略3: 风险调整仓位策略
+    #df3, buy3, sell3 = risk_adjusted_position_strategy(stock_data)
+    df3, buy3, sell3 = final_simplified_risk_strategy(stock_data)
+    stats3, trades3, cum_ret3 = backtest_analysis(buy3, sell3, "风险调整策略")
 
     # 策略比较总结
     print("\n" + "=" * 80)
@@ -468,14 +1131,16 @@ def compare_strategies(stock_data):
     if stats1:
         strategies.append(("无过滤策略", stats1['total_trades'], stats1['total_return'], stats1['win_rate']))
     if stats2:
-        strategies.append(("轻量级过滤", stats2['total_trades'], stats2['total_return'], stats2['win_rate']))
+        strategies.append(("模式过滤", stats2['total_trades'], stats2['total_return'], stats2['win_rate']))
     if stats3:
-        strategies.append(("自适应策略", stats3['total_trades'], stats3['total_return'], stats3['win_rate']))
+        avg_position = stats3['avg_position_size'] * 100 if 'avg_position_size' in stats3 else 100
+        strategies.append((f"风险调整(平均仓位{avg_position:.0f}%)",
+                          stats3['total_trades'], stats3['total_return'], stats3['win_rate']))
 
-    print(f"{'策略名称':<15} {'交易次数':<10} {'累计收益率':<12} {'胜率':<10}")
-    print("-" * 50)
+    print(f"{'策略名称':<20} {'交易次数':<10} {'累计收益率':<12} {'胜率':<10}")
+    print("-" * 60)
     for name, trades, ret, win_rate in strategies:
-        print(f"{name:<15} {trades:<10} {ret:.2f}%{'':<8} {win_rate:.2f}%")
+        print(f"{name:<20} {trades:<10} {ret:.2f}%{'':<8} {win_rate:.2f}%")
 
     # 返回最佳策略
     if strategies:
@@ -484,10 +1149,9 @@ def compare_strategies(stock_data):
 
     return {
         '无过滤': (df1, buy1, sell1, cum_ret1, stats1),
-        '轻量级': (df2, buy2, sell2, cum_ret2, stats2),
-        '自适应': (df3, buy3, sell3, cum_ret3, stats3)
+        '模式过滤': (df2, buy2, sell2, cum_ret2, stats2),
+        '风险调整': (df3, buy3, sell3, cum_ret3, stats3)
     }
-
 
 def plot_comparison(strategy_results):
     """
@@ -498,7 +1162,8 @@ def plot_comparison(strategy_results):
     # 累计收益率比较
     ax1 = axes[0, 0]
     colors = ['blue', 'green', 'red']
-    strategy_names = ['无过滤', '轻量级', '自适应']
+    #strategy_names = ['无过滤', '轻量级', '自适应']
+    strategy_names = ['无过滤', '模式过滤', '风险调整']
     color_mapping = dict(zip(strategy_names, colors))  # 创建策略名称到颜色的映射
 
     for i, (name, color) in enumerate(zip(strategy_names, colors)):
@@ -698,8 +1363,8 @@ def main():
     """
     主函数
     """
-    # stack_code = "2330.TW"
-    stack_code = "2891.TW"
+    stack_code = "2345.TW"
+    #stack_code = "2891.TW"
     years = 10
     end_date = datetime.now()
     start_date = end_date - timedelta(days=365 * years)

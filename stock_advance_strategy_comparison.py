@@ -771,7 +771,7 @@ def simplified_risk_adjustment(stock_data):
 
 def final_simplified_risk_strategy(stock_data):
     """
-    最终版简化风险调整策略 - 基于所有测试结果优化
+    最终版简化风险调整策略 - 实盘使用版本
     """
     df = calculate_technical_indicators(stock_data)
 
@@ -790,19 +790,18 @@ def final_simplified_risk_strategy(stock_data):
         rsi = df['RSI'].iloc[i]
         volume = df['Volume'].iloc[i]
         avg_volume = df['Volume'].rolling(20).mean().iloc[i]
-        macd = df['MACD'].iloc[i]
 
         ma5_prev = df['MA5'].iloc[i - 1]
         ma20_prev = df['MA20'].iloc[i - 1]
         ma60_prev = df['MA60'].iloc[i - 1]
 
+        # 买入条件
         golden_cross_5_20 = (ma5 > ma20) and (ma5_prev <= ma20_prev)
         death_cross_20_60 = (ma20 < ma60) and (ma20_prev >= ma60_prev)
-
         base_condition = golden_cross_5_20 and close_price > ma200
 
         if base_condition and not holding:
-            # 最终优化的风险因子
+            # 风险评分
             risk_factors = [
                 rsi > 72,  # RSI超买
                 volume < avg_volume * 0.8,  # 成交量不足
@@ -811,32 +810,25 @@ def final_simplified_risk_strategy(stock_data):
 
             risk_score = sum(risk_factors)
 
-            # 最终优化的仓位映射
+            # 仓位调整
             if risk_score == 0:
-                position_size = 1.0  # 无风险，满仓
-                risk_level = "优质"
+                position_size = 1.0  # 优质信号，满仓
             elif risk_score == 1:
-                position_size = 0.75  # 轻度风险，75%仓位
-                risk_level = "良好"
+                position_size = 0.75  # 良好信号，75%仓位
             elif risk_score == 2:
-                position_size = 0.5  # 中度风险，50%仓位
-                risk_level = "谨慎"
+                position_size = 0.5  # 谨慎信号，50%仓位
             else:  # risk_score == 3
-                position_size = 0.25  # 高度风险，25%仓位
-                risk_level = "高风险"
+                position_size = 0.25  # 高风险信号，25%仓位
 
             buy_signals.append((date, close_price, position_size))
             position_sizes.append(position_size)
             holding = True
 
-            print(f"最终策略: {risk_level}, 仓位={position_size * 100}%, 风险分数={risk_score}")
-
+        # 卖出条件
         elif death_cross_20_60 and holding:
             sell_signals.append((date, close_price))
             holding = False
 
-    avg_position = np.mean(position_sizes) * 100 if position_sizes else 0
-    print(f"最终简化风险策略: 平均仓位大小 = {avg_position:.1f}%")
     return df, buy_signals, sell_signals
 
 def adaptive_ma_signals(stock_data):
